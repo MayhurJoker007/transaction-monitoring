@@ -1,0 +1,29 @@
+# Screening runs as its own deployment: it scales on its own, and a backlog or a crash here never slows ingestion.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: txmon-screening-worker
+  labels: {app: txmon, component: screening-worker}
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: txmon, component: screening-worker}
+  template:
+    metadata:
+      labels: {app: txmon, component: screening-worker}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 10001}
+      terminationGracePeriodSeconds: 60     # let in-flight screening finish on rollout
+      containers:
+        - name: worker
+          image: ghcr.io/mayhurjoker007/transaction-monitoring:latest
+          command: ["celery", "-A", "config", "worker", "-Q", "screening", "--concurrency", "4", "--loglevel", "INFO"]
+          envFrom: [{configMapRef: {name: txmon-config}}, {secretRef: {name: txmon-secrets}}]
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "celery -A config inspect ping -d celery@$HOSTNAME --timeout 10"]
+            periodSeconds: 60
+            timeoutSeconds: 20
+          resources:
+            requests: {cpu: 200m, memory: 256Mi}
+            limits: {memory: 512Mi}

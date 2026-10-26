@@ -1,0 +1,35 @@
+x-app: &app
+  build: .
+  environment:
+    DATABASE_URL: postgres://txmon:txmon@db:5432/txmon
+    CELERY_BROKER_URL: redis://redis:6379/0
+    DJANGO_SECRET_KEY: change-me-for-anything-real
+    DJANGO_DEBUG: "false"
+    DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_started
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: txmon
+      POSTGRES_PASSWORD: txmon
+      POSTGRES_DB: txmon
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "txmon"]
+      interval: 2s
+      retries: 15
+  redis:
+    image: redis:7-alpine
+  api:
+    <<: *app
+    command: sh -c "python manage.py migrate && gunicorn config.wsgi --bind 0.0.0.0:8000 --workers 3"
+    ports:
+      - "8000:8000"
+  screening-worker:
+    <<: *app
+    command: celery -A config worker -Q screening --concurrency 4 --loglevel INFO

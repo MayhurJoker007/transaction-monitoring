@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: txmon-config
+data:
+  DJANGO_DEBUG: "false"
+  DJANGO_ALLOWED_HOSTS: "txmon.example.internal"
+  CELERY_BROKER_URL: "redis://txmon-redis:6379/0"
+  LOG_LEVEL: "INFO"
+---
+# Real values come from a secret manager (AWS Secrets Manager via External Secrets, for example).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: txmon-secrets
+type: Opaque
+stringData:
+  DJANGO_SECRET_KEY: "replace-me"
+  DATABASE_URL: "postgres://txmon:replace-me@txmon-db.example.rds.amazonaws.com:5432/txmon"
